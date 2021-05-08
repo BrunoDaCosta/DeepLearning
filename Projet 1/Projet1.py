@@ -48,19 +48,19 @@ def compute_nb_errors(model, data_input, data_target, mini_batch_size):
     return nb_data_errors
 
 class Net(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.conv1 = nn.Conv2d(2, 8, kernel_size=3)
-        self.conv2 = nn.Conv2d(8, 16, kernel_size=5)
-        self.conv3 = nn.Conv2d(16, 32, kernel_size=5)
-        self.fc1 = nn.Linear(32*4*1, 100)
-        self.fc2 = nn.Linear(100, 100)
-        self.fc3 = nn.Linear(100, 1)
+    def _init_(self):
+        super()._init_()
+        self.conv1 = nn.Conv2d(2, 32, kernel_size=3)
+        self.conv2 = nn.Conv2d(32, 32, kernel_size=5)
+        self.conv3 = nn.Conv2d(32, 32, kernel_size=5)
+        self.fc1 = nn.Linear(32*4*1, 50)
+        self.fc2 = nn.Linear(50, 20)
+        self.fc3 = nn.Linear(20, 1)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
-        x = F.relu(F.max_pool2d(self.conv3(x), kernel_size=2))
+        x = F.relu(F.max_pool2d(self.conv3(x), kernel_size=2, stride=2))
         
         x = F.relu(self.fc1(x.view(-1,32*4*1)))
         x = F.relu(self.fc2(x))
@@ -70,12 +70,13 @@ class Net(nn.Module):
 class Net_wh(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv2d(1, 16, kernel_size=3)
-        self.conv2 = nn.Conv2d(16, 16, kernel_size=5)
-        self.conv3 = nn.Conv2d(16, 32, kernel_size=5)
-        self.fc1 = nn.Linear(32*4*2, 100)
-        self.fc2 = nn.Linear(100, 100)
-        self.fc3 = nn.Linear(100, 1)
+        self.conv1 = nn.Conv2d(1, 24, kernel_size=3)
+        self.conv2 = nn.Conv2d(24, 24, kernel_size=5)
+        self.conv3 = nn.Conv2d(24, 24, kernel_size=5)
+        self.fc1 = nn.Linear(24*4*2, 100)
+        self.fc2 = nn.Linear(100, 50)
+        self.fc3 = nn.Linear(50, 20)
+        self.fc4 = nn.Linear(20, 1)
 
     def forward(self, x):
         (x_1,x_2) = torch.split(x, 1, 1)
@@ -87,22 +88,25 @@ class Net_wh(nn.Module):
         x_2 = F.relu(F.max_pool2d(self.conv3(x_2), kernel_size=2))
         
         x = torch.cat((x_1, x_2),1)
-        x = F.relu(self.fc1(x.view(-1,32*4*2)))
+        x = F.relu(self.fc1(x.view(-1,24*4*2)))
         x = F.relu(self.fc2(x))
-        x = self.fc3(x).sum(1)
+        x = F.relu(self.fc3(x))
+        x = self.fc4(x).sum(1)
         return x, False
 
+
 class Net_al(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.conv1 = nn.Conv2d(2, 8, kernel_size=3)
-        self.conv2 = nn.Conv2d(8, 16, kernel_size=5)
-        self.conv3 = nn.Conv2d(16, 32, kernel_size=5)
+    def _init_(self):
+        super()._init_()
+        self.conv1 = nn.Conv2d(2, 32, kernel_size=3)
+        self.conv2 = nn.Conv2d(32, 32, kernel_size=5)
+        self.conv3 = nn.Conv2d(32, 32, kernel_size=5)
 
         self.fc1 = nn.Linear(64*2*1, 100)
         self.fc2 = nn.Linear(100, 1)
         self.fc1_cl = nn.Linear(64*2*1, 100)
-        self.fc2_cl = nn.Linear(100, 2)
+        self.fc2_cl = nn.Linear(100, 10)
+        self.fc3_cl = nn.Linear(100, 10)
         
     def forward(self, x):
         x = F.relu(self.conv1(x))
@@ -112,7 +116,15 @@ class Net_al(nn.Module):
         x_target = F.relu(self.fc1(x.view(-1,64*2*1)))
         x_target = self.fc2(x_target).sum(1)
         x_classes = F.relu(self.fc1_cl(x.view(-1, 64*2*1)))
-        x_classes = self.fc2_cl(x_classes)
+
+        x_classes_1 = self.fc2_cl(x_classes)
+        x_classes_2 = self.fc3_cl(x_classes)
+
+        x_classes_1 = torch.argmax(x_classes_1,1)
+        x_classes_2 = torch.argmax(x_classes_2,1)
+
+        x_classes = torch.cat((x_classes_1.view(-1,1), x_classes_2.view(-1,1)), 1)
+
 
         return (x_target, x_classes)
 
@@ -147,17 +159,25 @@ class Net_wh_al(nn.Module):
 mini_batch_size = 50
 nb_epochs = 25
 
-for i in range(10):
-    model = Net_al()
-    print(sum(p.numel() for p in model.parameters() if p.requires_grad))
+repeats = 10
+err=torch.empty(2,repeats)
+for i in range(repeats):
+    model = Net_wh()
+    if i==0:
+        print("Number of params: {}".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
+    
     train_input, train_target, train_classes, test_input, test_target, test_classes = generate_pair_sets(1000)
     mean, std = train_input.mean(), train_input.std()
     train_input.sub_(mean).div_(std)
     test_input.sub_(mean).div_(std)
 
-    ##train_model(model, train_input, train_target.to(torch.float), mini_batch_size, nb_epochs)                                                                                                    
-    train_model2(model, train_input, train_target.to(torch.float), train_classes.to(torch.float), mini_batch_size, nb_epochs)
+    train_model(model, train_input, train_target.to(torch.float), mini_batch_size, nb_epochs)                                                                                                    
+    ##train_model2(model, train_input, train_target.to(torch.float), train_classes.to(torch.float), mini_batch_size, nb_epochs)
 
-    print('train_error {:.02f}% test_error {:.02f}%'.format( \
-                compute_nb_errors(model, train_input, train_target, mini_batch_size) / train_input.size(0) * 100,
-                compute_nb_errors(model, test_input, test_target, mini_batch_size) / test_input.size(0) * 100 ))
+    err[0][i] = compute_nb_errors(model, train_input, train_target, mini_batch_size) / train_input.size(0) * 100
+    err[1][i] = compute_nb_errors(model, test_input, test_target, mini_batch_size) / test_input.size(0) * 100 
+    print('{}/{} - train_error {:.02f}% test_error {:.02f}%'.format(i+1, repeats, err[0][i], err[1][i]))
+print("Mean training error: {:.02f}%".format(err[1].mean()))
+
+import matplotlib.pyplot as plt
+plt.boxplot(err[1])
