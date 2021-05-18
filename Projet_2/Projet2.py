@@ -9,15 +9,21 @@ torch.set_grad_enabled(False)
 def tanh(x):
     return x.tanh()
 
-def dsigma(x):
+def dtanh(x):
     return 4 * (x.exp() + x.mul(-1).exp()).pow(-2)
+
+def relu(x):
+    return  x.relu()
+
+def drelu(x):
+    return (x > 0).float()
 
 ######################################################################
 
-def loss(v, t):
+def MSEloss(v, t):
     return (v - t).pow(2).sum()
 
-def dloss(v, t):
+def MSEdloss(v, t):
     return 2 * (v - t)
 
 ######################################################################
