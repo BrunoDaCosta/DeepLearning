@@ -1,124 +1,58 @@
-import math as math
 from torch import empty
-from generate_data import *
 
-torch.set_grad_enabled(False)
+class Module:
+    def __init__(self):
+        pass
+    def forward(self , * input):
+        raise NotImplementedError
 
-######################################################################
-
-def tanh(x):
-    return x.tanh()
-
-def dtanh(x):
-    return 4 * (x.exp() + x.mul(-1).exp()).pow(-2)
-
-def relu(x):
-    return  x.relu()
-
-def drelu(x):
-    return (x > 0).float()
-
-######################################################################
-
-def MSEloss(v, t):
-    return (v - t).pow(2).sum()
-
-def MSEdloss(v, t):
-    return 2 * (v - t)
-
-######################################################################
-
-class Module(object):
-
-    def forward_pass(self, w1, b1, w2, b2, x):
-        x0 = x
-        s1 = w1.mv(x0) + b1
-        x1 = sigma(s1)
-        s2 = w2.mv(x1) + b2
-        x2 = sigma(s2)
-
-        return x0, s1, x1, s2, x2
-
-    def backward_pass(self, w1, b1, w2, b2,
-                      t,
-                      x, s1, x1, s2, x2,
-                      dl_dw1, dl_db1, dl_dw2, dl_db2):
-        x0 = x
-        dl_dx2 = dloss(x2, t)
-        dl_ds2 = dsigma(s2) * dl_dx2
-        dl_dx1 = w2.t().mv(dl_ds2)
-        dl_ds1 = dsigma(s1) * dl_dx1
-
-        dl_dw2.add_(dl_ds2.view(-1, 1).mm(x1.view(1, -1)))
-        dl_db2.add_(dl_ds2)
-        dl_dw1.add_(dl_ds1.view(-1, 1).mm(x0.view(1, -1)))
-        dl_db1.add_(dl_ds1)
+    def backward(self , * gradwrtoutput):
+        raise NotImplementedError
 
     def param(self):
-        return []
+        return ["jaj"]
 
-######################################################################
+class linear(Module):
+    def __init__(self, nbinput, nboutput):
+        super().__init__()
+        self.w = empty(nbinput, nboutput).normal_(0, epsilon)
+        self.b = empty(nboutput).normal_(0, epsilon)
+    def forward_pass(self,x):
+        y = self.w.mv(x) + self.b
+        return y
 
-train_input, train_label, test_input, test_label = generate_data()
-                                                                  
+    def backward_pass(self, x, dl_dy):
+        dl_dx = self.w.t().mv(dl_dy)
+        dl_dw = dl_dy.view(-1, 1).mm(x.view(1, -1))
+        dl_db = dl_dy
 
-#nb_hidden = 50
-#eta = 1e-1 / nb_train_samples
-#epsilon = 1e-6
+        self.w = self.w - eta * dl_dw
+        self.b = self.b - eta * dl_db
 
-#w1 = torch.empty(nb_hidden, train_input.size(1)).normal_(0, epsilon)
-#b1 = torch.empty(nb_hidden).normal_(0, epsilon)
-#w2 = torch.empty(nb_classes, nb_hidden).normal_(0, epsilon)
-#b2 = torch.empty(nb_classes).normal_(0, epsilon)
+        return dl_dx
 
-#dl_dw1 = torch.empty(w1.size())
-#dl_db1 = torch.empty(b1.size())
-#dl_dw2 = torch.empty(w2.size())
-#dl_db2 = torch.empty(b2.size())
+class tanh(Module):
 
-#for k in range(1000):
+    def __init__(self):
+        super().__init__()
 
-#    # Back-prop
+    def forward_pass(self):
+        return x.tanh()
 
-#    acc_loss = 0
-#    nb_train_errors = 0
+    def backward_pass(self, dloss):
+        return dloss * (4 * (x.exp() + x.mul(-1).exp()).pow(-2))
 
-#    dl_dw1.zero_()
-#    dl_db1.zero_()
-#    dl_dw2.zero_()
-#    dl_db2.zero_()
+class relu(Module):
 
-#    for n in range(nb_train_samples):
-#        x0, s1, x1, s2, x2 = forward_pass(w1, b1, w2, b2, train_input[n])
+    def __init__(self):
+        super().__init__()
 
-#        pred = x2.max(0)[1].item()
-#        if train_target[n, pred] < 0.5: nb_train_errors = nb_train_errors + 1
-#        acc_loss = acc_loss + loss(x2, train_target[n])
+    def forward_pass(self):
+        return x.relu()
 
-#        backward_pass(w1, b1, w2, b2,
-#                      train_target[n],
-#                      x0, s1, x1, s2, x2,
-#                      dl_dw1, dl_db1, dl_dw2, dl_db2)
+    def backward_pass(self, dloss):
+        return dloss * (x > 0).float()
 
-#    # Gradient step
-
-#    w1 = w1 - eta * dl_dw1
-#    b1 = b1 - eta * dl_db1
-#    w2 = w2 - eta * dl_dw2
-#    b2 = b2 - eta * dl_db2
-
-#    # Test error
-
-#    nb_test_errors = 0
-
-#    for n in range(test_input.size(0)):
-#        _, _, _, _, x2 = forward_pass(w1, b1, w2, b2, test_input[n])
-
-#        pred = x2.max(0)[1].item()
-#        if test_target[n, pred] < 0.5: nb_test_errors = nb_test_errors + 1
-
-#    print('{:d} acc_train_loss {:.02f} acc_train_error {:.02f}% test_error {:.02f}%'
-#          .format(k,
-#                  acc_loss,
-#                  (100 * nb_train_errors) / train_input.size(0),
-#                  (100 * nb_test_errors) / test_input.size(0)))
+epsilon = 0.001
+a = linear(1,2)
+print(a.param())
