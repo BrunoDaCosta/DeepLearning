@@ -1,6 +1,12 @@
 from torch import empty
 from generate_data import *
 
+def loss(v, t):
+    return (v - t).pow(2).sum()
+
+def dloss(v, t):
+    return 2 * (v - t)
+
 class Module:
     def __init__(self):
         pass
@@ -18,6 +24,7 @@ class linear(Module):
         super().__init__()
         self.w = empty(nbinput, nboutput).normal_(0, epsilon)
         self.b = empty(nboutput).normal_(0, epsilon)
+
     def forward_pass(self,x):
         y = self.w.mv(x) + self.b
         return y
@@ -54,7 +61,9 @@ class relu(Module):
     def backward_pass(self, dloss):
         return dloss * (x > 0).float()
 
+
 train_data, train_label, test_data, test_label = generate_data()
 epsilon = 0.001
+eta = 1e-6
 a = linear(1,2)
 print(a.param())
