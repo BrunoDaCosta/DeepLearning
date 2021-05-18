@@ -1,4 +1,5 @@
 from torch import empty
+from generate_data import *
 
 class Module:
     def __init__(self):
@@ -53,6 +54,7 @@ class relu(Module):
     def backward_pass(self, dloss):
         return dloss * (x > 0).float()
 
+train_data, train_label, test_data, test_label = generate_data()
 epsilon = 0.001
 a = linear(1,2)
 print(a.param())
