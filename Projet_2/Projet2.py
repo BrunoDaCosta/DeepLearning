@@ -56,8 +56,9 @@ class linear(Module):
         #print(self.dl_db)
 
         dl_dx = self.w.t().mv(dl_dy)
-
-        self.dl_dw.add_(dl_dy.view(-1, 1).mm(self.x.view(1, -1)))
+        #print(self.x)
+        #print(dl_dy)
+        self.dl_dw.add_((self.x.view(-1,1).mm(dl_dy.view(-1,1).t())).t())
         self.dl_db.add_(dl_dy)
         #print("x")
         #print(self.x)
@@ -74,7 +75,7 @@ class linear(Module):
         return dl_dx
 
     def param(self):
-        return [(self.w, self.dl_dw * eta), (self.b, self.dl_db * eta)]
+        return [(self.w, self.dl_dw), (self.b, self.dl_db)]
 
 
 class tanh(Module):
@@ -159,28 +160,24 @@ class sequential(Module):
         for layer in self.layers:
             par = layer.param()
             if par:
-                weight = par[0]
-                weight, dw = weight
+                weight, dw = par[0]
                 #print("weight")
                 #print(weight)
                 #print(dw)
-                weight -= dw
-                bias = par[1]
-                bias, db = bias
+                weight -= dw * eta
+                bias, db = par[1]
                 #print("bias")
                 #print(bias)
                 #print(db)
-                bias -= db
+                bias -= db * eta
     
     def zero_grad(self):
         for layer in self.layers:
             par = layer.param()
             if par:
-                weight = par[0]
-                weight, dw = weight
+                _, dw = par[0]
                 dw.zero_()
-                bias = par[1]
-                bias, db = bias
+                _, db = par[1]
                 db.zero_()
 
 def classify(result, objective):
@@ -188,12 +185,13 @@ def classify(result, objective):
     errors = result != objective
     return errors.sum()
 
-VERBOSE = 1
+VERBOSE = 0
 
-nbiter = 100
+nbiter = 300
 nbdata = 100
-eta = 1e-2 / nbdata
-epsilon = 0.1
+eta_start = 1e-1 / nbdata
+epsilon = 0.3
+eta = eta_start
 
 train_input, train_label, test_input, test_label = generate_data(nbdata)
 mean, std = train_input.mean(), train_input.std()
@@ -203,41 +201,59 @@ test_input.sub_(mean).div_(std)
 #train_label.zero_()
 #train_label += 1
 
-model = sequential(linear(2,25), leaky_relu(), linear(25, 1), leaky_relu())
+model = sequential(linear(2,25), leaky_relu(), linear(25,25), leaky_relu(), linear(25,25), leaky_relu(),linear(25, 1), leaky_relu())
 par = model.param()
 
 #print(par)
 #print(train_label.size())
 #print(train_input)
 mod_loss = torch.zeros(nbiter)
+xest = torch.empty(nbdata,1)
+errors = torch.empty(nbiter)
 for i in range(nbiter):
+    #eta = eta_start * (1 - (i/nbiter))
+    print(model.param()[-1])
     model.zero_grad()
+    print(model.param()[-1])
+    print("########")
     for n in range(nbdata):
-        yest = model.forward_pass(train_input[n])
+        xest[n] = model.forward_pass(train_input[n])
         #print(train_input[n], yest)
-        mod_loss[i] += MSEloss(yest, train_label[n])
-        loss = MSEdloss(yest, train_label[n])
-        #print(yest, loss, train_label[n])
-        #print(loss)
-        model.backward_pass(loss)
+        dloss = MSEdloss(xest[n], train_label[n])
+        mod_loss[i] += MSEloss(xest[n], train_label[n])
+
+        model.backward_pass(dloss)
     model.step()
 
+    mod_loss[i] /= nbdata
+    errors[i] = classify(xest, train_label).item() / nbdata * 100
+
+    print("###\n{0:.1f}% - MSE :  {1}".format(i / nbiter * 100, mod_loss[i]))
     if VERBOSE:
-        print("MSE : {0:.1f}%:  {1}\n###".format(i/nbiter*100, mod_loss[i]))
+        print("        Classification error: {0:.1f}%".format(errors[i]))
 
 torch.set_printoptions(precision=2)
 
-par = model.param()
-#print(par)
-xest = torch.empty(nbdata,1)
 for n in range(nbdata):
     xest[n] = model.forward_pass(train_input[n])
 if VERBOSE:
     print(xest.t())
     print(train_label.t())
 print("Classification error:\n {0:.1f}%\n".format(classify(xest,train_label).item()/nbdata*100))
+#print(model.param())
 
 import matplotlib.pyplot as plt
-plt.figure()
-plt.plot(mod_loss.numpy())
+def close_event():
+    plt.close()
+fig = plt.figure()
+timer = fig.canvas.new_timer(interval=10000)
+timer.add_callback(close_event)
+plt.subplot(2,1,1)
+plt.plot(mod_loss.numpy(), 'b')
+plt.title("MSE loss")
+plt.subplot(2,1,2)
+plt.plot(errors.numpy(), 'r')
+plt.title("Percentage of classification errors")
+plt.savefig("latest_data.png") # save the fig as png
+timer.start()
 plt.show()
