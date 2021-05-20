@@ -124,7 +124,7 @@ class leaky_relu(Module):
     def backward_pass(self, dloss):
         #print(dloss)
         #print(dloss * (self.x > 0).float())
-        self.x[self.x < 0] = 0.01
+        self.x[self.x <= 0] = 0.01
         self.x[self.x > 0] = 1
         return dloss * self.x
 
@@ -183,50 +183,61 @@ class sequential(Module):
                 bias, db = bias
                 db.zero_()
 
+def classify(result, objective):
+    result = result >= 0.5
+    errors = result != objective
+    return errors.sum()
 
-train_input, train_label, test_input, test_label = generate_data_lin()
+VERBOSE = 1
+
+nbiter = 100
+nbdata = 100
+eta = 1e-2 / nbdata
+epsilon = 0.1
+
+train_input, train_label, test_input, test_label = generate_data(nbdata)
 mean, std = train_input.mean(), train_input.std()
 train_input.sub_(mean).div_(std)
 test_input.sub_(mean).div_(std)
 
 #train_label.zero_()
 #train_label += 1
-epsilon = 0.1
-"""
-model = sequential(linear(1,2))
 
-input_data = torch.tensor([1.])
-print(model.param())
-"""
-
-nb_input = train_input.size(0)
-eta = 1e-2 / nb_input
-nbtests = 50
-
-model = sequential(linear(2,25), leaky_relu(), linear(25, 1), tanh())
+model = sequential(linear(2,25), leaky_relu(), linear(25, 1), leaky_relu())
 par = model.param()
+
 #print(par)
 #print(train_label.size())
 #print(train_input)
-for i in range(nbtests):
-    mod_loss = 0
+mod_loss = torch.zeros(nbiter)
+for i in range(nbiter):
     model.zero_grad()
-    for n in range(nb_input):
+    for n in range(nbdata):
         yest = model.forward_pass(train_input[n])
         #print(train_input[n], yest)
-        mod_loss += MSEloss(yest, train_label[n])
+        mod_loss[i] += MSEloss(yest, train_label[n])
         loss = MSEdloss(yest, train_label[n])
         #print(yest, loss, train_label[n])
         #print(loss)
         model.backward_pass(loss)
     model.step()
-    print("MSE")
-    print(mod_loss)
-    print("###")
+
+    if VERBOSE:
+        print("MSE : {0:.1f}%:  {1}\n###".format(i/nbiter*100, mod_loss[i]))
+
+torch.set_printoptions(precision=2)
 
 par = model.param()
 #print(par)
-for n in range(nb_input):
-    xest = model.forward_pass(train_input[n])
-    print(xest)
-print(train_label.t())
+xest = torch.empty(nbdata,1)
+for n in range(nbdata):
+    xest[n] = model.forward_pass(train_input[n])
+if VERBOSE:
+    print(xest.t())
+    print(train_label.t())
+print("Classification error:\n {0:.1f}%\n".format(classify(xest,train_label).item()/nbdata*100))
+
+import matplotlib.pyplot as plt
+plt.figure()
+plt.plot(mod_loss.numpy())
+plt.show()
