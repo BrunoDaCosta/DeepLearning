@@ -1,6 +1,10 @@
 from torch import empty
 import torch
 import math
+import matplotlib.pyplot as plt
+from matplotlib import cm
+from matplotlib.ticker import LinearLocator
+import numpy as np
 
 from generate_data import *
 
@@ -12,7 +16,7 @@ def MSEloss(v, t):
 def MSEdloss(v, t):
     return 2 * (v - t)
 
-""""
+
 def CrossEntropyloss(y_est, y):
     if y == 1:
         return -math.log(y_est)
@@ -24,7 +28,7 @@ def CrossEntropydloss(y_est, y):
         return -1/y_est
     else:
         return 1/(1-y_est)
-"""
+
 class Module:
 
     def __init__(self):
@@ -216,8 +220,8 @@ def classify(result, objective):
 
 VERBOSE = 0
 
-nbiter = 1000
-nbdata = 1000
+nbiter = 500
+nbdata = 3000
 eta_start = 1e-1 / nbdata
 epsilon = 0.3
 eta = eta_start
@@ -236,6 +240,7 @@ par = model.param()
 #print(par)
 #print(train_label.size())
 #print(train_input)
+
 mod_loss = torch.zeros(nbiter)
 xest = torch.empty(nbdata,1)
 xest_test = torch.empty(nbdata,1)
@@ -280,6 +285,7 @@ print("Classification error:\n {0:.1f}%\n".format(classify(xest,train_label).ite
 import matplotlib.pyplot as plt
 def close_event():
     plt.close()
+"""
 fig = plt.figure()
 timer = fig.canvas.new_timer(interval=10000)
 #timer.add_callback(close_event)
@@ -295,3 +301,56 @@ plt.title("Percentage of classification errors for test")
 plt.savefig("latest_data.png") # save the fig as png
 #timer.start()
 plt.show()
+"""
+"""
+nbpoints=100
+value = np.zeros((100,100))
+
+for i in range(nbpoints):
+    for j in range(nbpoints):
+        value_to_test = torch.tensor([i/50-1, j/50-1])
+        #value_to_test = [i/50-1,j/50-1]
+        #print(train_input[0])
+        #print(value_to_test)
+        value[i][j]=model.forward_pass(value_to_test)
+
+fig = plt.figure()
+plt.plot(value)
+plt.show()
+print(value)
+print(value.shape)
+"""
+fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+
+# Make data.
+minmax=2
+nbpoints = 100
+X = np.arange(-minmax, minmax, 2*minmax/nbpoints)
+Y = np.arange(-minmax, minmax, 2*minmax/nbpoints)
+X, Y = np.meshgrid(X, Y)
+
+
+Z = np.zeros((nbpoints,nbpoints))
+for i in range(nbpoints):
+    for j in range(nbpoints):
+        print(str(100 * (i * nbpoints + j) / (nbpoints * nbpoints)) + "% done")
+        #print(model.forward_pass(torch.tensor([i/(nbpoints/(2*minmax))-minmax, j/(nbpoints/(2*minmax))-minmax])))
+        Z[i][j] = model.forward_pass(torch.tensor([i/(nbpoints/(2*minmax))-minmax, j/(nbpoints/(2*minmax))-minmax]))
+
+Z[Z >= 0.5] = 1
+Z[Z < 0.5] = 0
+# Plot the surface.
+surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm,
+                       linewidth=0, antialiased=False)
+
+# Customize the z axis.
+ax.set_zlim(-1.5, 1.5)
+ax.zaxis.set_major_locator(LinearLocator(10))
+# A StrMethodFormatter is used automatically
+ax.zaxis.set_major_formatter('{x:.02f}')
+
+# Add a color bar which maps values to colors.
+fig.colorbar(surf, shrink=0.5, aspect=5)
+
+plt.show()
+
