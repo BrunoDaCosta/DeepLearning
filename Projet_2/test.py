@@ -4,8 +4,8 @@ from generate_data import *
 
 VERBOSE = 0
 
-nbiter = 300
-nbdata = 100
+nbiter = 100
+nbdata = 300
 
 epsilon = 0.3
 eta = 1e-1 / nbdata
@@ -59,28 +59,61 @@ if VERBOSE:
 print("Classification error:\n {0:.1f}%\n".format(classify(xest,train_label).item()/nbdata*100))
 #print(model.param())
 
-import matplotlib.pyplot as plt
-def close_event():
-    plt.close()
-fig = plt.figure()
-timer = fig.canvas.new_timer(interval=10000)
-#timer.add_callback(close_event)
-plt.subplot(3,1,1)
-plt.plot(mod_loss.numpy(), 'b')
-plt.title("MSE loss")
-plt.subplot(3,1,2)
-plt.plot(errors.numpy(), 'r')
-plt.title("Percentage of classification errors for train")
-plt.subplot(3,1,3)
-plt.plot(errors_test.numpy(), 'g')
-plt.title("Percentage of classification errors for test")
-plt.savefig("latest_data.png") # save the fig as png
-#timer.start()
-plt.show()
+print_curves = 0
+if print_curves:
+    import matplotlib.pyplot as plt
+    def close_event():
+        plt.close()
+    fig = plt.figure()
+    timer = fig.canvas.new_timer(interval=10000)
+    #timer.add_callback(close_event)
+    plt.subplot(3,1,1)
+    plt.plot(mod_loss.numpy(), 'b')
+    plt.title("MSE loss")
+    plt.subplot(3,1,2)
+    plt.plot(errors.numpy(), 'r')
+    plt.title("Percentage of classification errors for train")
+    plt.subplot(3,1,3)
+    plt.plot(errors_test.numpy(), 'g')
+    plt.title("Percentage of classification errors for test")
+    plt.savefig("latest_data.png") # save the fig as png
+    #timer.start()
+    plt.show()
 
-heat_size = 100
-heatmap = torch.empty(heat_size**2, 3)
-for i in range(0,heat_size**2,heat_size):
-    for j in range(heat_size):
-        heatmap[i][0] = i/heat_size
-        heatmap[i+j][1] = j/heat_size
+
+import matplotlib.pyplot as plt
+from matplotlib import cm
+from matplotlib.ticker import LinearLocator
+import numpy as np
+
+print_separation = 1
+if print_separation:
+    fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+    # Make data.
+    minmax=2
+    nbpoints = 100
+    X = np.arange(-minmax, minmax, 2*minmax/nbpoints)
+    Y = np.arange(-minmax, minmax, 2*minmax/nbpoints)
+    X, Y = np.meshgrid(X, Y)
+
+    Z = np.zeros((nbpoints,nbpoints))
+    for i in range(nbpoints):
+        for j in range(nbpoints):
+            print(str(100 * (i * nbpoints + j) / (nbpoints * nbpoints)) + "% done")
+            #print(model.forward_pass(torch.tensor([i/(nbpoints/(2*minmax))-minmax, j/(nbpoints/(2*minmax))-minmax])))
+            Z[i][j] = model.forward_pass(torch.tensor([i/(nbpoints/(2*minmax))-minmax, j/(nbpoints/(2*minmax))-minmax]))
+
+    Z[Z >= 0.5] = 1
+    Z[Z < 0.5] = 0
+    # Plot the surface.
+    surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm,
+                           linewidth=0, antialiased=False)
+
+    # Customize the z axis.
+    ax.set_zlim(-1.5, 1.5)
+    ax.zaxis.set_major_locator(LinearLocator(10))
+    # A StrMethodFormatter is used automatically
+    ax.zaxis.set_major_formatter('{x:.02f}')
+    # Add a color bar which maps values to colors.
+    fig.colorbar(surf, shrink=0.5, aspect=5)
+    plt.show()
