@@ -5,8 +5,8 @@ from generate_data import *
 VERBOSE = 0
 torch.set_printoptions(precision=2)
 
-nbiter = 400
-nbdata = 1500
+nbiter = 300
+nbdata = 300
 
 epsilon = 0.3
 eta = 1e-1 / nbdata
@@ -16,10 +16,10 @@ mean, std = train_input.mean(), train_input.std()
 train_input.sub_(mean).div_(std)
 test_input.sub_(mean).div_(std)
 
-model = sequential(linear(2,25, epsilon=epsilon), leaky_relu(),
-                   linear(25,25, epsilon=epsilon), leaky_relu(),
-                   linear(25,25, epsilon=epsilon), leaky_relu(),
-                   linear(25, 1, epsilon=epsilon), sigmoid(),
+model = Sequential(Linear(2,25, epsilon=epsilon), leaky_ReLU(),
+                   Linear(25,25, epsilon=epsilon), leaky_ReLU(),
+                   Linear(25,25, epsilon=epsilon), leaky_ReLU(),
+                   Linear(25, 1, epsilon=epsilon), Sigmoid(),
                    eta=eta)
 
 mod_loss = torch.zeros(nbiter)
@@ -32,11 +32,11 @@ for i in range(nbiter):
     model.zero_grad()
     # accumulate gradient on all samples then apply it to the weights and offset
     for n in range(nbdata):
-        xest[n] = model.forward_pass(train_input[n])
-        dloss = MSEdloss(xest[n], train_label[n])
-        mod_loss[i] += MSEloss(xest[n], train_label[n])
-        model.backward_pass(dloss)
-        xest_test[n] = model.forward_pass(test_input[n])
+        xest[n] = model.forward(train_input[n])
+        dloss = dLossMSE(xest[n], train_label[n])
+        mod_loss[i] += LossMSE(xest[n], train_label[n])
+        model.backward(dloss)
+        xest_test[n] = model.forward(test_input[n])
     model.step()
 
     # Log the loss and train + test error at each iteration for plotting
@@ -50,11 +50,14 @@ for i in range(nbiter):
 
 # Run the forward pass on test data with the trained model, and print classification error
 for n in range(nbdata):
-    xest[n] = model.forward_pass(train_input[n])
+    xest[n] = model.forward(train_input[n])
+    xest_test[n] = model.forward(test_input[n])
 if VERBOSE:
     print(xest.t())
     print(train_label.t())
-print("Test data classification error:\n {0:.1f}%\n".format(classify(xest,train_label).item()/nbdata*100))
+print("Train data classification error: {0:.1f}%".format(classify(xest,train_label).item()/nbdata*100))
+print("Test data classification error: {0:.1f}%".format(classify(xest_test,test_label).item()/nbdata*100))
+
 
 # Plot the loss, train+test error rate curves with respect to iterations
 print_curves = True
@@ -95,7 +98,7 @@ if print_separation:
     Z = np.zeros((nbpoints,nbpoints))
     for i in range(nbpoints):
         for j in range(nbpoints):
-            Z[i][j] = model.forward_pass(torch.tensor([float(X[i]), float(Y[j])]).sub_(mean).div_(std))
+            Z[i][j] = model.forward(torch.tensor([float(X[i]), float(Y[j])]).sub_(mean).div_(std))
         #print("Reconstructing: {0:.1f}% done".format(i/nbpoints*100))
 
     # Plot the raw output, or the classified output
