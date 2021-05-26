@@ -3,7 +3,6 @@ import csv
 import numpy as np
 import time
 from datetime import datetime
-
 from six.moves import urllib
 
 opener = urllib.request.build_opener()
@@ -112,8 +111,8 @@ class Net_wh_al(nn.Module):
         self.conv3 = nn.Conv2d(32, 32, kernel_size=5)
 
         self.fc1 = nn.Linear(32 * 4 * 2, 50)
-        self.fc3 = nn.Linear(50, 20)
-        self.fc4 = nn.Linear(20, 1)
+        self.fc2 = nn.Linear(50, 20)
+        self.fc3 = nn.Linear(20, 1)
         self.fc1_cl = nn.Linear(32 * 2 * 2, 100)
         self.fc2_cl = nn.Linear(100, 40)
         self.fc3_cl = nn.Linear(40, 10)
@@ -129,8 +128,8 @@ class Net_wh_al(nn.Module):
 
         x = torch.cat((x_1, x_2), 1)
         x_target = F.relu(self.fc1(x.view(-1, 32 * 4 * 2)))
-        x_target = F.relu(self.fc3(x_target))
-        x_target = self.fc4(x_target).sum(1)
+        x_target = F.relu(self.fc2(x_target))
+        x_target = self.fc3(x_target).sum(1)
         x_1 = F.relu(self.fc1_cl(x_1.view(-1, 32 * 2 * 2)))
         x_1 = F.relu(self.fc2_cl(x_1))
         x_1 = F.relu(self.fc3_cl(x_1)).reshape([-1, 10, 1])
@@ -145,7 +144,7 @@ class Net_wh_al(nn.Module):
 mini_batch_size = 50
 nb_epochs = 25
 rangetest = 10
-print_all = True
+print_all = False
 
 #############################
 #Use of GPU
@@ -156,68 +155,70 @@ else:
     device = torch.device('cpu')
     print("Use of CPU")
 #############################
-modelnow = Net_wh_al
-if (modelnow == Net_wh_al):
-    trainmethod = train_model2
-    print("Use of WH_AL")
-else:
-    trainmethod = train_model
-    print("NO AL")
-model = modelnow()
-print(sum(p.numel() for p in model.parameters() if p.requires_grad))
-time_start=datetime.now()
-with open('data.csv', mode='w') as data_file:
-    data_writer = csv.writer(data_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-    data_writer.writerow(["Mean Train", "Var Train ", "Mean Test", "Var Test"])
-    list_mean_train = []
-    list_mean_test = []
-    # print(ratio)
-    for i in range(rangetest):
-        model = modelnow().to(device)
-        # print(sum(p.numel() for p in model.parameters() if p.requires_grad))
-        train_input, train_target, train_classes, test_input, test_target, test_classes = generate_pair_sets(1000)
+for modelnow in (Net, Net_wh, Net_wh_al):
+    print(modelnow.__name__)
+    if (modelnow == Net_wh_al):
+        trainmethod = train_model2
+    else:
+        trainmethod = train_model
+    model = modelnow()
+    print("Number parameters: " + str(sum(p.numel() for p in model.parameters() if p.requires_grad)))
+    time_start=datetime.now()
+    string = "data_" + str(modelnow.__name__) + str(rangetest)
+    with open(string, mode='w') as data_file:
+        data_writer = csv.writer(data_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        data_writer.writerow(["Mean Train", "Var Train ", "Mean Test", "Var Test"])
+        list_mean_train = []
+        list_mean_test = []
+        # print(ratio)
+        for i in range(rangetest):
+            model = modelnow().to(device)
+            # print(sum(p.numel() for p in model.parameters() if p.requires_grad))
+            train_input, train_target, train_classes, test_input, test_target, test_classes = generate_pair_sets(1000)
 
-        #Move to gpu
-        train_input = train_input.to(device)
-        train_target = train_target.to(device)
-        train_classes = train_classes.to(device)
-        test_input = test_input.to(device)
-        test_target = test_target.to(device)
-        test_classes = test_classes.to(device)
+            #Move to gpu
+            train_input = train_input.to(device)
+            train_target = train_target.to(device)
+            train_classes = train_classes.to(device)
+            test_input = test_input.to(device)
+            test_target = test_target.to(device)
+            test_classes = test_classes.to(device)
 
-        mean, std = train_input.mean(), train_input.std()
-        train_input.sub_(mean).div_(std)
-        test_input.sub_(mean).div_(std)
+            mean, std = train_input.mean(), train_input.std()
+            train_input.sub_(mean).div_(std)
+            test_input.sub_(mean).div_(std)
 
-        #trainmethod(model, train_input, train_target.to(torch.float), mini_batch_size, nb_epochs)
-        trainmethod(model, train_input, train_target.to(torch.float), train_classes.to(torch.float),
-                        mini_batch_size, nb_epochs)
+            if(modelnow == Net_wh_al):
+                trainmethod(model, train_input, train_target.to(torch.float), train_classes.to(torch.float),
+                            mini_batch_size, nb_epochs)
+            else:
+                trainmethod(model, train_input, train_target.to(torch.float), mini_batch_size, nb_epochs)
 
-        train_error = compute_nb_errors(model, train_input, train_target, mini_batch_size) / train_input.size(
-                0) * 100
-        test_error = compute_nb_errors(model, test_input, test_target, mini_batch_size) / test_input.size(0) * 100
-        if (print_all):
-            print('train_error {:.02f}% test_error {:.02f}%'.format(train_error, test_error))
+            train_error = compute_nb_errors(model, train_input, train_target, mini_batch_size) / train_input.size(
+                    0) * 100
+            test_error = compute_nb_errors(model, test_input, test_target, mini_batch_size) / test_input.size(0) * 100
+            if (print_all):
+                print('train_error {:.02f}% test_error {:.02f}%'.format(train_error, test_error))
 
-        list_mean_train.append(train_error)
-        list_mean_test.append(test_error)
-        time_now = datetime.now()
-        per_done = 100*(i+1)/rangetest
-        est_time = (time_start+(time_now-time_start)*100/(per_done)).strftime("%H:%M:%S")
+            list_mean_train.append(train_error)
+            list_mean_test.append(test_error)
+            time_now = datetime.now()
+            per_done = 100*(i+1)/rangetest
+            est_time = (time_start+(time_now-time_start)*100/(per_done)).strftime("%H:%M:%S")
 
-        print("Done: " + str(round(per_done,2))+ "/100" + " Heure de fin: " + str(est_time))
+            print("Done: " + str(round(per_done,2))+ "/100" + " Heure de fin: " + str(est_time))
 
 
-    val_mean_train = np.mean(list_mean_train)
-    val_mean_test = np.mean(list_mean_test)
-    val_var_train = np.var(list_mean_train)
-    val_var_test = np.var(list_mean_test)
-    mtr = str(round(val_mean_train, 2))
-    vtr = str(round(val_var_train, 2))
-    mte = str(round(val_mean_test, 2))
-    vte = str(round(val_var_test, 2))
+        val_mean_train = np.mean(list_mean_train)
+        val_mean_test = np.mean(list_mean_test)
+        val_var_train = np.var(list_mean_train)
+        val_var_test = np.var(list_mean_test)
+        mtr = str(round(val_mean_train, 2))
+        vtr = str(round(val_var_train, 2))
+        mte = str(round(val_mean_test, 2))
+        vte = str(round(val_var_test, 2))
 
-    print("Train error mean: " + mtr + " Train variance: " + vtr)
-    print("Test error mean: " + mte + " Test variance: " + vte)
+        print("Train error mean: " + mtr + " Train variance: " + vtr)
+        print("Test error mean: " + mte + " Test variance: " + vte)
 
-    data_writer.writerow({mtr, vtr, mte, vte})
+        data_writer.writerow({mtr, vtr, mte, vte})
