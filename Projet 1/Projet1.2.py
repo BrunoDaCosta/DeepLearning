@@ -36,8 +36,8 @@ def train_model2(model, train_input, train_target, train_classes, mini_batch_siz
     for e in range(nb_epochs):
         for b in range(0, train_input.size(0), mini_batch_size):
             (output, output2) = model(train_input.narrow(0, b, mini_batch_size))
-            loss = 0.8 * criterion(output, train_target.narrow(0, b, mini_batch_size)) + \
-                   0.2 * criterion2(output2, train_classes.narrow(0, b, mini_batch_size).long())
+            loss = 0.7 * criterion(output, train_target.narrow(0, b, mini_batch_size)) + \
+                   0.3 * criterion2(output2, train_classes.narrow(0, b, mini_batch_size).long())
             model.zero_grad()
             loss.backward()
             optimizer.step()
@@ -104,42 +104,6 @@ class Net_wh(nn.Module):
         x = self.fc4(x).sum(1)
         return x, False
 
-
-class Net_al(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.conv1 = nn.Conv2d(2, 16, kernel_size=3)
-        self.conv2 = nn.Conv2d(16, 16, kernel_size=5)
-        self.conv3 = nn.Conv2d(16, 32, kernel_size=5)
-
-        self.fc1 = nn.Linear(64 * 2 * 1, 100)
-        self.fc2 = nn.Linear(100, 100)
-        self.fc3 = nn.Linear(100, 1)
-        self.fc1_cl = nn.Linear(64 * 2 * 1, 100)
-        self.fc2_cl = nn.Linear(100, 50)
-        self.fc3_cl = nn.Linear(50, 50)
-        self.fc4_cl = nn.Linear(50, 20)
-
-    def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = F.relu(F.max_pool2d(self.conv3(x), kernel_size=2))
-
-        x_target = F.relu(self.fc1(x.view(-1, 64 * 2 * 1)))
-        x_target = F.relu(self.fc2(x_target))
-        x_target = self.fc3(x_target).sum(1)
-        x_classes = F.relu(self.fc1_cl(x.view(-1, 64 * 2 * 1)))
-
-        x_classes = F.relu(self.fc2_cl(x_classes))
-        x_classes = F.relu(self.fc3_cl(x_classes))
-        x_classes = F.relu(self.fc4_cl(x_classes))
-
-
-        x_classes = x_classes.reshape([-1, 10, 2])
-
-        return (x_target, x_classes)
-
-
 class Net_wh_al(nn.Module):
     def __init__(self):
         super().__init__()
@@ -193,9 +157,9 @@ else:
     print("Use of CPU")
 #############################
 modelnow = Net_wh_al
-if (modelnow == Net_al or modelnow == Net_wh_al):
+if (modelnow == Net_wh_al):
     trainmethod = train_model2
-    print("Use of AL")
+    print("Use of WH_AL")
 else:
     trainmethod = train_model
     print("NO AL")
@@ -233,7 +197,7 @@ with open('data.csv', mode='w') as data_file:
                 0) * 100
         test_error = compute_nb_errors(model, test_input, test_target, mini_batch_size) / test_input.size(0) * 100
         if (print_all):
-            print('        train_error {:.02f}% test_error {:.02f}%'.format(train_error, test_error))
+            print('train_error {:.02f}% test_error {:.02f}%'.format(train_error, test_error))
 
         list_mean_train.append(train_error)
         list_mean_test.append(test_error)
