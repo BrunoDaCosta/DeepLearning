@@ -31,12 +31,13 @@ def train_model(model, train_input, train_target, mini_batch_size, nb_epochs=25)
 
 def train_model2(model, train_input, train_target, train_classes, mini_batch_size, nb_epochs=25):
     criterion = nn.MSELoss().to(device)
+    criterion2 = nn.CrossEntropyLoss().to(device)
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
     for e in range(nb_epochs):
         for b in range(0, train_input.size(0), mini_batch_size):
             (output, output2) = model(train_input.narrow(0, b, mini_batch_size))
-            loss = 0.8 * criterion(output, train_target.narrow(0, b, mini_batch_size)) + 0.2 * criterion(
-                output2, train_classes.narrow(0, b, mini_batch_size))
+            loss = 0.8 * criterion(output, train_target.narrow(0, b, mini_batch_size)) + \
+                   0.2 * criterion2(output2, train_classes.narrow(0, b, mini_batch_size).long())
             model.zero_grad()
             loss.backward()
             optimizer.step()
@@ -115,10 +116,9 @@ class Net_al(nn.Module):
         self.fc2 = nn.Linear(100, 100)
         self.fc3 = nn.Linear(100, 1)
         self.fc1_cl = nn.Linear(64 * 2 * 1, 100)
-        self.fc21_cl = nn.Linear(100, 50)
-        self.fc22_cl = nn.Linear(100, 50)
-        self.fc31_cl = nn.Linear(50, 10)
-        self.fc32_cl = nn.Linear(50, 10)
+        self.fc2_cl = nn.Linear(100, 50)
+        self.fc3_cl = nn.Linear(50, 50)
+        self.fc4_cl = nn.Linear(50, 20)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
@@ -130,15 +130,12 @@ class Net_al(nn.Module):
         x_target = self.fc3(x_target).sum(1)
         x_classes = F.relu(self.fc1_cl(x.view(-1, 64 * 2 * 1)))
 
-        x_classes_1 = F.relu(self.fc21_cl(x_classes))
-        x_classes_2 = F.relu(self.fc22_cl(x_classes))
-        x_classes_1 = self.fc31_cl(x_classes_1)
-        x_classes_2 = self.fc32_cl(x_classes_2)
+        x_classes = F.relu(self.fc2_cl(x_classes))
+        x_classes = F.relu(self.fc3_cl(x_classes))
+        x_classes = F.relu(self.fc4_cl(x_classes))
 
-        x_classes_1 = torch.argmax(x_classes_1, 1)
-        x_classes_2 = torch.argmax(x_classes_2, 1)
 
-        x_classes = torch.cat((x_classes_1, x_classes_2), 0).reshape([-1, 2])
+        x_classes = x_classes.reshape([-1, 10, 2])
 
         return (x_target, x_classes)
 
@@ -154,7 +151,8 @@ class Net_wh_al(nn.Module):
         self.fc3 = nn.Linear(50, 20)
         self.fc4 = nn.Linear(20, 1)
         self.fc1_cl = nn.Linear(32 * 2 * 2, 100)
-        self.fc2_cl = nn.Linear(100, 10)
+        self.fc2_cl = nn.Linear(100, 40)
+        self.fc3_cl = nn.Linear(40, 10)
 
     def forward(self, x):
         (x_1, x_2) = torch.split(x, 1, 1)
@@ -170,19 +168,20 @@ class Net_wh_al(nn.Module):
         x_target = F.relu(self.fc3(x_target))
         x_target = self.fc4(x_target).sum(1)
         x_1 = F.relu(self.fc1_cl(x_1.view(-1, 32 * 2 * 2)))
-        x_1 = self.fc2_cl(x_1)
+        x_1 = F.relu(self.fc2_cl(x_1))
+        x_1 = F.relu(self.fc3_cl(x_1)).reshape([-1, 10, 1])
         x_2 = F.relu(self.fc1_cl(x_2.view(-1, 32 * 2 * 2)))
-        x_2 = self.fc2_cl(x_2)
-        x_1 = torch.argmax(x_1, 1)
-        x_2 = torch.argmax(x_2, 1)
-        x_classes = torch.cat((x_1, x_2), 0).reshape([-1, 2])
+        x_2 = F.relu(self.fc2_cl(x_2))
+        x_2 = F.relu(self.fc3_cl(x_2)).reshape([-1, 10, 1])
+
+        x_classes = torch.cat((x_1, x_2), 2)
         return (x_target, x_classes)
 
 
 mini_batch_size = 50
 nb_epochs = 25
-rangetest = 100
-print_all = False
+rangetest = 10
+print_all = True
 
 #############################
 #Use of GPU
