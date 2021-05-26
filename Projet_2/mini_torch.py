@@ -5,23 +5,9 @@ import math
 def MSEloss(v, t):
     return (v - t).pow(2).sum()
 
-
 def MSEdloss(v, t):
     return 2 * (v - t)
 
-""""
-def CrossEntropyloss(y_est, y):
-    if y == 1:
-        return -math.log(y_est)
-    else:
-        return -math.log(1 - y_est)
-
-def CrossEntropydloss(y_est, y):
-    if y == 1:
-        return -1/y_est
-    else:
-        return 1/(1-y_est)
-"""
 class Module:
 
     def __init__(self):
@@ -35,7 +21,6 @@ class Module:
 
     def param(self):
         raise NotImplementedError
-
 
 class linear(Module):
 
@@ -87,7 +72,6 @@ class linear(Module):
     def param(self):
         return [(self.w, self.dl_dw), (self.b, self.dl_db)]
 
-
 class tanh(Module):
 
     def __init__(self):
@@ -118,7 +102,6 @@ class sigmoid(Module):
 
     def param(self):
         return []
-
 
 class relu(Module):
 
