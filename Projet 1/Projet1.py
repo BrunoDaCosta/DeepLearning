@@ -12,7 +12,7 @@ from dlc_practical_prologue import *
 
 def train_model(model, train_input, train_target, mini_batch_size, nb_epochs=25):
     criterion = nn.MSELoss()
-    optimizer = optim.SGD(model.parameters(), lr = 1e-1)
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
     for e in range(nb_epochs):
         for b in range(0, train_input.size(0), mini_batch_size):
@@ -24,7 +24,7 @@ def train_model(model, train_input, train_target, mini_batch_size, nb_epochs=25)
 
 def train_model2(model, train_input, train_target, train_classes, mini_batch_size, nb_epochs=25):
     criterion = nn.MSELoss()
-    optimizer = optim.SGD(model.parameters(), lr = 1e-1)
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
     for e in range(nb_epochs):
         for b in range(0, train_input.size(0), mini_batch_size):
@@ -74,9 +74,9 @@ class Net_wh(nn.Module):
         self.conv2 = nn.Conv2d(24, 24, kernel_size=5)
         self.conv3 = nn.Conv2d(24, 24, kernel_size=5)
         self.fc1 = nn.Linear(24*4*2, 100)
-        self.fc2 = nn.Linear(100, 50)
-        self.fc3 = nn.Linear(50, 20)
-        self.fc4 = nn.Linear(20, 1)
+        self.fc2= nn.Linear(100, 50)
+        self.fc3= nn.Linear(50, 20)
+        self.fc4= nn.Linear(20, 1)
 
     def forward(self, x):
         (x_1,x_2) = torch.split(x, 1, 1)
@@ -159,7 +159,7 @@ class Net_wh_al(nn.Module):
 mini_batch_size = 50
 nb_epochs = 25
 
-repeats = 10
+repeats = 100
 err=torch.empty(2,repeats)
 for i in range(repeats):
     model = Net_wh()
@@ -177,7 +177,8 @@ for i in range(repeats):
     err[0][i] = compute_nb_errors(model, train_input, train_target, mini_batch_size) / train_input.size(0) * 100
     err[1][i] = compute_nb_errors(model, test_input, test_target, mini_batch_size) / test_input.size(0) * 100 
     print('{}/{} - train_error {:.02f}% test_error {:.02f}%'.format(i+1, repeats, err[0][i], err[1][i]))
-print("Mean training error: {:.02f}%".format(err[1].mean()))
+print("Mean training error: {:.02f}%, mean testing error: {:.02f}%".format(err[0].mean(),err[1].mean()))
+print("training var: {:.02f}%, testing var: {:.02f}%".format(err[0].var(),err[1].var()))
 
 import matplotlib.pyplot as plt
 plt.boxplot(err[1])
