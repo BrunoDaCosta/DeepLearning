@@ -67,12 +67,18 @@ if print_curves:
     plt.subplot(3,1,1)
     plt.plot(mod_loss.numpy(), 'b')
     plt.title("MSE loss")
+    plt.xticks([])
+    plt.ylabel("loss")
     plt.subplot(3,1,2)
     plt.plot(errors.numpy(), 'r')
     plt.title("Percentage of classification errors for train")
+    plt.xticks([])
+    plt.ylabel("%")
     plt.subplot(3,1,3)
     plt.plot(errors_test.numpy(), 'g')
     plt.title("Percentage of classification errors for test")
+    plt.xlabel("Iterations")
+    plt.ylabel("%")
     plt.savefig("graph_{}data_{}iter.png".format(nbdata, nbiter)) # save the fig as png
     plt.show()
 
@@ -109,6 +115,8 @@ if print_separation:
 
     # Plot the result
     surf = ax.imshow(Z, extent = [min, max, min, max])
+    plt.xlabel("X")
+    plt.ylabel("Y")
 
     # Add a color bar which maps values to colors.
     fig.colorbar(surf, shrink=0.5, aspect=5)
