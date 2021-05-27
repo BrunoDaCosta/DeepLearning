@@ -5,8 +5,8 @@ from generate_data import *
 VERBOSE = 0
 torch.set_printoptions(precision=2)
 
-nbiter = 300
-nbdata = 300
+nbiter = 400
+nbdata = 1000
 
 epsilon = 0.3
 eta = 1e-1 / nbdata
@@ -73,13 +73,13 @@ if print_curves:
     plt.subplot(3,1,3)
     plt.plot(errors_test.numpy(), 'g')
     plt.title("Percentage of classification errors for test")
-    plt.savefig("latest_data.png") # save the fig as png
+    plt.savefig("graph_{}data_{}iter.png".format(nbdata, nbiter)) # save the fig as png
     plt.show()
 
 
 
 # Create a grid and evaluate all points in it, to reconstruct a separation of space with the trained model
-print_separation = False
+print_separation = True
 if print_separation:
     print("Starting boundary reconstruction")
     import matplotlib.pyplot as plt
@@ -112,4 +112,5 @@ if print_separation:
 
     # Add a color bar which maps values to colors.
     fig.colorbar(surf, shrink=0.5, aspect=5)
+    plt.savefig("circle_{}data_{}iter_{}x{}points.png".format(nbdata, nbiter, nbpoints, nbpoints)) # save the fig as png
     plt.show()
