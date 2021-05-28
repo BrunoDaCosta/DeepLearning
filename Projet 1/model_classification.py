@@ -1,7 +1,5 @@
 import torch
-import csv
 import numpy as np
-import time
 from datetime import datetime
 from six.moves import urllib
 
@@ -15,7 +13,7 @@ from torch.nn import functional as F
 from dlc_practical_prologue import *
 
 
-def train_model(model, train_input, train_target, mini_batch_size, nb_epochs=25):
+def train_model(model, train_input, train_target, mini_batch_size, device, nb_epochs=25):
     criterion = nn.MSELoss().to(device)
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
@@ -28,7 +26,7 @@ def train_model(model, train_input, train_target, mini_batch_size, nb_epochs=25)
             optimizer.step()
 
 
-def train_model2(model, train_input, train_target, train_classes, mini_batch_size, nb_epochs=25):
+def train_model2(model, train_input, train_target, train_classes, mini_batch_size, device, nb_epochs=25):
     criterion = nn.MSELoss().to(device)
     criterion2 = nn.CrossEntropyLoss().to(device)
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
@@ -103,6 +101,7 @@ class Net_wh(nn.Module):
         x = self.fc4(x).sum(1)
         return x, False
 
+
 class Net_wh_al(nn.Module):
     def __init__(self):
         super().__init__()
@@ -141,42 +140,37 @@ class Net_wh_al(nn.Module):
         return (x_target, x_classes)
 
 
-mini_batch_size = 50
-nb_epochs = 25
-rangetest = 10
-print_all = False
+def run_tests(rangetest, listmodels, print_all=False):
+    mini_batch_size = 50
+    nb_epochs = 25
 
-#############################
-#Use of GPU
-if torch.cuda.is_available():
-    device = torch.device('cuda')
-    print("Use of GPU")
-else:
-    device = torch.device('cpu')
-    print("Use of CPU")
-#############################
-for modelnow in (Net, Net_wh, Net_wh_al):
-    print(modelnow.__name__)
-    if (modelnow == Net_wh_al):
-        trainmethod = train_model2
+    #############################
+    # Use of GPU
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+        print("Use of GPU")
     else:
-        trainmethod = train_model
-    model = modelnow()
-    print("Number parameters: " + str(sum(p.numel() for p in model.parameters() if p.requires_grad)))
-    time_start=datetime.now()
-    string = "data_" + str(modelnow.__name__) + str(rangetest)
-    with open(string, mode='w') as data_file:
-        data_writer = csv.writer(data_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        data_writer.writerow(["Mean Train", "Var Train ", "Mean Test", "Var Test"])
+        device = torch.device('cpu')
+        print("Use of CPU")
+    #############################
+    for modelnow in listmodels:
+        print(" ")
+        print("Current model trained: " + str(modelnow.__name__))
+        if (modelnow == Net_wh_al):
+            trainmethod = train_model2
+        else:
+            trainmethod = train_model
+        model = modelnow()
+        print("Number of parameters: " + str(sum(p.numel() for p in model.parameters() if p.requires_grad)))
+
         list_mean_train = []
         list_mean_test = []
-        # print(ratio)
         for i in range(rangetest):
             model = modelnow().to(device)
-            # print(sum(p.numel() for p in model.parameters() if p.requires_grad))
-            train_input, train_target, train_classes, test_input, test_target, test_classes = generate_pair_sets(1000)
+            train_input, train_target, train_classes, test_input, test_target, test_classes = generate_pair_sets(
+                1000)
 
-            #Move to gpu
+            # Move to gpu
             train_input = train_input.to(device)
             train_target = train_target.to(device)
             train_classes = train_classes.to(device)
@@ -188,26 +182,21 @@ for modelnow in (Net, Net_wh, Net_wh_al):
             train_input.sub_(mean).div_(std)
             test_input.sub_(mean).div_(std)
 
-            if(modelnow == Net_wh_al):
+            if (modelnow == Net_wh_al):
                 trainmethod(model, train_input, train_target.to(torch.float), train_classes.to(torch.float),
-                            mini_batch_size, nb_epochs)
+                            mini_batch_size, device, nb_epochs)
             else:
-                trainmethod(model, train_input, train_target.to(torch.float), mini_batch_size, nb_epochs)
+                trainmethod(model, train_input, train_target.to(torch.float), mini_batch_size, device, nb_epochs)
 
             train_error = compute_nb_errors(model, train_input, train_target, mini_batch_size) / train_input.size(
-                    0) * 100
-            test_error = compute_nb_errors(model, test_input, test_target, mini_batch_size) / test_input.size(0) * 100
+                0) * 100
+            test_error = compute_nb_errors(model, test_input, test_target, mini_batch_size) / test_input.size(
+                0) * 100
             if (print_all):
                 print('train_error {:.02f}% test_error {:.02f}%'.format(train_error, test_error))
 
             list_mean_train.append(train_error)
             list_mean_test.append(test_error)
-            time_now = datetime.now()
-            per_done = 100*(i+1)/rangetest
-            est_time = (time_start+(time_now-time_start)*100/(per_done)).strftime("%H:%M:%S")
-
-            print("Done: " + str(round(per_done,2))+ "/100" + " Heure de fin: " + str(est_time))
-
 
         val_mean_train = np.mean(list_mean_train)
         val_mean_test = np.mean(list_mean_test)
@@ -221,4 +210,5 @@ for modelnow in (Net, Net_wh, Net_wh_al):
         print("Train error mean: " + mtr + " Train variance: " + vtr)
         print("Test error mean: " + mte + " Test variance: " + vte)
 
-        data_writer.writerow({mtr, vtr, mte, vte})
+
+
